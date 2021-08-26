@@ -44,7 +44,17 @@ docker:
 engine_tests:
   # Provide at least one example input that can be used to test your code's MDI functionality
   script:
+    #- ~/miniconda3/bin/conda init bash
+    #- ~/miniconda3/bin/conda init zsh
+    #- ~/miniconda3/bin/conda activate
+    #- which psi4
     - export PATH=${PATH}:/repo/build/install/bin
     - export PYTHONPATH=${PYTHONPATH}:/repo/build/install/lib/python3.8/site-packages
     - cd tests/engine
     - python input.py
+
+test_drivers:
+  mytest:
+    script:
+      - cd tests/drivers/mytest
+      - python mytest.py
