@@ -1,3 +1,4 @@
+import os
 import qcengine as qcng
 import qcelemental as qcel
 
@@ -7,20 +8,7 @@ H  0.0 -0.791  0.543
 H  0.0  0.791  0.543
 """)
 
-#inp = qcel.models.AtomicInput(
-#    molecule=mol,
-#    driver="energy",
-#    model={"method": "SCF", "basis": "STO"},
-#    keywords={"basis__ngauss": "3",
-#              "scf__dirscf": ".TRUE.", 
-#              "guess__guess": "HUCKEL", 
-#              "contrl__units": "BOHR",
-#              "contrl__maxit": "60"}
-#    )
-
-#ret = qcng.compute(inp, "gamess")
-
-o = qcng.MDIServer(mdi_options = "-role ENGINE -name QM -method TCP -port 8021 -hostname localhost",
+o = qcng.MDIServer(mdi_options = os.getenv('MDI_OPTIONS'),
                    program = "gamess",
                    molecule = mol,
                    model={"method": "SCF", "basis": "STO"},
