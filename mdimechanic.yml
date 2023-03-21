@@ -3,9 +3,12 @@ docker:
   image_name: 'mdi/qcengine'
 
   build_image:
-    - apt-get update
-    - apt-get install -y git cmake wget
+    - apt-get update --fix-missing
+    - apt-get install -y git cmake wget rsync csh curl vim libblas-dev liblapack-dev patch nano make gcc gfortran groff || true
+    - apt-get install -y git cmake wget rsync csh curl vim libblas-dev liblapack-dev patch nano make gcc gfortran groff
+
     - pip install numpy
+    - pip install networkx
     - pip install pymdi
     - pip install pydantic
     - pip install PyYAML
@@ -14,16 +17,17 @@ docker:
     - pip install py-cpuinfo
     - pip install qcelemental
 
-    # Install miniconda
-    - mkdir -p ~/miniconda3
-    - wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O ~/miniconda3/miniconda.sh
-    - bash ~/miniconda3/miniconda.sh -b -u -p ~/miniconda3
-    - rm -rf ~/miniconda3/miniconda.sh
-    - ~/miniconda3/bin/conda init bash
-    - ~/miniconda3/bin/conda init zsh
+    - pip install jinja2
+    - pip install cmake
+    - pip install mpi4py
 
-    # Install Psi4, so that QCEngine can use it to run the tests
-    - ~/miniconda3/bin/conda install -c psi4 psi4
+    # Install ftnchek
+    - wget ftnchek-3.3.1.tar.gz https://www.dsm.fordham.edu/~ftnchek/download/ftnchek-3.3.1.tar.gz || true
+    - tar -zxvf ftnchek-3.3.1.tar.gz
+    - cd ftnchek-3.3.1
+    - ./configure
+    - make
+    - make install
 
   build_engine:
     - |
@@ -35,26 +39,98 @@ docker:
     - pip install --prefix=${REPO_DIR}/build/install .
     - echo "Insert commands to build your engine code here"
 
+
+    # Copy GAMESS source files into the build directory
+    - cd /repo
+    - mkdir -p build
+    - |
+      if [ ! -d "build/gamess" ] ; then
+        rsync -a source/gamess build
+        cd build/gamess
+    
+        # Ensure the line endings are lf
+        git rm --cached -r .
+        git reset --hard
+        cd ../../
+      fi
+    - cd build/gamess
+
+    # Prepare install.info
+    - export GCC_MAJOR_VERSION=`gcc --version | grep ^gcc | sed 's/gcc (.*) //g' | grep -o '[0-9]\{1,3\}\.[0-9]\{0,3\}\.[0-9]\{0,3\}' | cut -d '.' -f 1`
+    - export GCC_MINOR_VERSION=`gcc --version | grep ^gcc | sed 's/gcc (.*) //g' | grep -o '[0-9]\{1,3\}\.[0-9]\{0,3\}\.[0-9]\{0,3\}' | cut -d '.' -f 2`
+    - export NUM_CPU_CORES=`grep -c ^processor /proc/cpuinfo`
+    - python bin/create-install-info.py --fortran_version ${GCC_MAJOR_VERSION}.${GCC_MINOR_VERSION} --mdi --mpich --mpi --mpi_path /usr/lib/x86_64-linux-gnu/mpich
+
+    # Generate the Makefile
+    - export builddir=$(pwd)
+    - echo "GMS_PATH = ${builddir}" > Makefile
+    - echo "GMS_VERSION = 00" >> Makefile
+    - echo "GMS_BUILD_PATH = ${builddir}" >> Makefile
+    - echo "GMS_FC = gfortran" >> Makefile
+    - echo "GMS_CC = gcc" >> Makefile
+    - echo "GMS_MDI = true" >> Makefile
+    - export GMS_MDI=true
+    - echo 'include $(GMS_PATH)/Makefile.in' >> Makefile
+
+    # Build LAPACK
+    - ./tools/lapack/download-lapack.csh
+    - make -j $NUM_CPU_CORES lapack
+
+    # Build the MDI Library
+    - ./tools/mdi/download-mdi.csh
+    - make -j $NUM_CPU_CORES libmdi
+
+    # Build DDI
+    - make -j 1 ddi
+
+    # Build GAMESS
+    - make -j 1
+
+    # Set path options in rungms
+    - sed -i -z 's/set SCR=\n/set SCR=\/repo\/tests\/scratch\n/g' /repo/build/gamess/rungms
+    - sed -i -z 's/set USERSCR=\n/set USERSCR=\/repo\/tests\/scratch\/userscr\n/g' /repo/build/gamess/rungms
+    - sed -i -z 's/set GMSPATH=\n/set GMSPATH=\/repo\/build\/gamess\n/g' /repo/build/gamess/rungms
+
+    # Set MPI options for rungms
+    - sed -i -z 's/\nset TARGET=\n/\nset TARGET=mpi\n/g' /repo/build/gamess/rungms
+    - sed -i 's/set DDI_MPI_CHOICE=impi/set DDI_MPI_CHOICE=mpich/g' /repo/build/gamess/rungms
+
+
   validate_engine:
     - export PATH=${PATH}:/repo/build/install/bin
     - export PYTHONPATH=${PYTHONPATH}:/repo/build/install/lib/python3.8/site-packages
+    - export PATH=${PATH}:/repo/build/gamess
     - cd tests/validate
     - python input.py
 
 engine_tests:
   # Provide at least one example input that can be used to test your code's MDI functionality
   script:
-    #- ~/miniconda3/bin/conda init bash
-    #- ~/miniconda3/bin/conda init zsh
-    #- ~/miniconda3/bin/conda activate
-    #- which psi4
+    - cp /repo/build/gamess/install.info /install.info
+    - export GMSPATH=/repo/build/gamess
     - export PATH=${PATH}:/repo/build/install/bin
     - export PYTHONPATH=${PYTHONPATH}:/repo/build/install/lib/python3.8/site-packages
-    - cd tests/engine
+    - export PATH=${PATH}:/repo/build/gamess
+    - cd tests/gamess_mdi
     - python input.py
+
 
 test_drivers:
   mytest:
     script:
       - cd tests/drivers/mytest
       - python mytest.py
+
+run_scripts:
+  gamess:
+    containers:
+      container1:
+        image: 'mdi/qcengine'
+        script:
+          - cp /repo/build/gamess/install.info /install.info
+          - export GMSPATH=/repo/build/gamess
+          - export PATH=${PATH}:/repo/build/install/bin
+          - export PYTHONPATH=${PYTHONPATH}:/repo/build/install/lib/python3.8/site-packages
+          - export PATH=${PATH}:/repo/build/gamess
+          - cd tests/gamess
+          - python input.py

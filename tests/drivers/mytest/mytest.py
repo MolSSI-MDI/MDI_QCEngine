@@ -16,10 +16,13 @@ else:
     world_comm = None
 
 # Get the command-line options for MDI
+print("Start of driver")
 
 # Iniitalize MDI
 mdi_options = "-role DRIVER -name driver -method TCP -port 8021"
 mdi.MDI_Init(mdi_options)
+
+print("Initialized MDI")
 
 # Set world_comm to the correct intra-code MPI communicator
 world_comm = mdi.MDI_MPI_get_world_comm()
@@ -31,11 +34,13 @@ else:
     my_rank = 0
  
 # Accept a connection from an external driver
+print("Accepting communicator")
 mdi_comm = mdi.MDI_Accept_Communicator()
 
 # This is the part where you can use MDI
 if my_rank == 0:
     # <NAME
+    print("Asking name")
     mdi.MDI_Send_Command("<NAME", mdi_comm)
     engine_name = mdi.MDI_Recv(mdi.MDI_NAME_LENGTH, mdi.MDI_CHAR, mdi_comm)
     print("ENGINE NAME: " + str(engine_name))
