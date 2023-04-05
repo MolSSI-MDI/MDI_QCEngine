@@ -99,7 +99,7 @@ docker:
     - cd /repo
     - |
       if [ ! -d "build/lammps" ]; then
-        git clone https://github.com/lammps/lammps.git --branch mdi-expand build/lammps
+        git clone https://github.com/lammps/lammps.git build/lammps
       fi
     - LAMMPS_INSTALL='mpi'
 
@@ -141,7 +141,7 @@ run_scripts:
   gamess:
     containers:
       container1:
-        image: 'mdi/qcengine'
+        image: 'mdi/qcengine-gamess-lammps'
         script:
           - cp /repo/build/gamess/install.info /install.info
           - export GMSPATH=/repo/build/gamess
@@ -150,3 +150,28 @@ run_scripts:
           - export PATH=${PATH}:/repo/build/gamess
           - cd tests/gamess
           - python input.py
+
+  hostname:
+    containers:
+      container1:
+        image: 'mdi/qcengine-gamess-lammps'
+        script:
+          - echo "${MDI_OPTIONS}"
+
+  gamess-lammps:
+    containers:
+      container1:
+        image: 'mdi/qcengine-gamess-lammps'
+        script:
+          - cp /repo/build/gamess/install.info /install.info
+          - export GMSPATH=/repo/build/gamess
+          - export PATH=${PATH}:/repo/build/install/bin
+          - export PYTHONPATH=${PYTHONPATH}:/repo/build/install/lib/python3.8/site-packages
+          - export PATH=${PATH}:/repo/build/gamess
+          - cd tests/lammps
+          - python input.py &
+
+          - export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/repo/build/lammps/src
+          - cd tests/mdi_test
+          - ../../build/lammps/build/lmp_mdi -mdi "-role DRIVER -name driver -method TCP -port 8021" -in lammps.in > lammps.out
+
