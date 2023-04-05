@@ -1,6 +1,6 @@
 code_name: 'QCEngine'
 docker:
-  image_name: 'mdi/qcengine'
+  image_name: 'mdi/qcengine-gamess-lammps'
 
   build_image:
     - apt-get update --fix-missing
@@ -95,6 +95,22 @@ docker:
     - sed -i -z 's/\nset TARGET=\n/\nset TARGET=mpi\n/g' /repo/build/gamess/rungms
     - sed -i 's/set DDI_MPI_CHOICE=impi/set DDI_MPI_CHOICE=mpich/g' /repo/build/gamess/rungms
 
+    # Obtain a clone of LAMMPS
+    - cd /repo
+    - |
+      if [ ! -d "build/lammps" ]; then
+        git clone https://github.com/lammps/lammps.git --branch mdi-expand build/lammps
+      fi
+    - LAMMPS_INSTALL='mpi'
+
+    # Build LAMMPS
+    - cd build
+    - mkdir -p lammps/build
+    - cd lammps/build
+    - cmake -D PKG_RIGID=yes -D PKG_MOLECULE=yes -D PKG_KSPACE=yes -D PKG_MDI=yes -D BUILD_SHARED_LIBS=yes -D LAMMPS_MACHINE=mpi ../cmake
+    - make
+    - cp lmp_mpi lmp_mdi
+    - cp liblammps_mpi.so liblammps.so
 
   validate_engine:
     - export PATH=${PATH}:/repo/build/install/bin
