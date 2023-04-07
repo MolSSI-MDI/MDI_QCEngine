@@ -112,6 +112,17 @@ docker:
     - cp lmp_mpi lmp_mdi
     - cp liblammps_mpi.so liblammps.so
 
+   # Build a standalone copy of the MDI Library
+    - |
+      if [ ! -d "/repo/build/MDI_Library" ]; then
+        git clone https://github.com/MolSSI-MDI/MDI_Library.git /repo/build/MDI_Library
+      fi
+      cd /repo/build/MDI_Library
+      mkdir -p build
+      cd build
+      cmake -Dtest_codes=ON -Dlanguage=CXX ..
+      make
+
   validate_engine:
     - export PATH=${PATH}:/repo/build/install/bin
     - export PYTHONPATH=${PYTHONPATH}:/repo/build/install/lib/python3.8/site-packages
@@ -187,3 +198,16 @@ run_scripts:
           - export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/repo/build/lammps/src
           - cd tests/lammps
           - mpiexec -n 1 python mpi.py ':' -n 1 ../../build/lammps/build/lmp_mdi -mdi "-role DRIVER -name driver -method MPI" -in lammps.in > lammps.out
+
+  test_mpi:
+    containers:
+      container1:
+        image: 'mdi/qcengine-gamess-lammps'
+        script:
+          - cp /repo/build/gamess/install.info /install.info
+          - export GMSPATH=/repo/build/gamess
+          - export PATH=${PATH}:/repo/build/install/bin
+          - export PYTHONPATH=${PYTHONPATH}:/repo/build/install/lib/python3.8/site-packages
+          - export PATH=${PATH}:/repo/build/gamess
+          - cd /repo/tests/lammps
+          - mpiexec -n 1 python mpi.py ':' -n 1 /repo/build/MDI_Library/build/driver_cxx -mdi "-role DRIVER -name driver -method MPI" > output
