@@ -8,7 +8,7 @@ H  0.0 -0.791  0.543
 H  0.0  0.791  0.543
 """)
 
-o = qcng.MDIServer(mdi_options = '-role ENGINE -name QM -method TCP -port 8021 -hostname localhost',
+o = qcng.MDIServer(mdi_options = '-role ENGINE -name QM -method MPI',
                    program = "gamess",
                    molecule = mol,
                    model={"method": "SCF", "basis": "STO"},
