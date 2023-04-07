@@ -211,3 +211,10 @@ run_scripts:
           - export PATH=${PATH}:/repo/build/gamess
           - cd /repo/tests/lammps
           - mpiexec -n 1 python mpi.py ':' -n 1 /repo/build/MDI_Library/build/driver_cxx -mdi "-role DRIVER -name driver -method MPI" > output
+
+  test_hello:
+    containers:
+      container1:
+        image: 'mdi/qcengine-gamess-lammps'
+        script:
+          - mpiexec -n 1 /repo/build/MDI_Library/build/engine_cxx -mdi "-role ENGINE -name QM -method MPI" ':' -n 1 /repo/build/MDI_Library/build/driver_cxx -mdi "-role DRIVER -name driver -method MPI"
